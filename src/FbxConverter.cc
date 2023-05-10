@@ -5,7 +5,7 @@
 
 #include <brotli/decode.h>
 
-//#define BINARY
+#define BINARY
 
 FbxConverter::FbxConverter(const char* resourcePacksDir) {
     manager = FbxManager::Create();
@@ -154,41 +154,6 @@ bool FbxConverter::importMesh(const Badger::Mesh& meshData, size_t meshId) {
         mesh->EndPolygon();
     }
 
-    /*if (!meshData.indices.empty()) {
-        std::cout << "Assigning mesh to bones." << std::endl;
-        auto skin = FbxSkin::Create(scene, (meshData.name + "_skin").c_str());
-
-        std::unordered_map<std::string, FbxCluster*> clusterMap;
-
-        for (auto i = 0; i < meshData.indices.capacity(); i++) {
-            auto boneNames = meshData.indices[i];
-            
-            for (auto j = 0; j < boneNames.capacity(); j++) {
-                auto boneName = boneNames[j];
-                auto weight = meshData.weights[i][j];
-
-                FbxCluster* cluster;
-                if (auto pair = clusterMap.find(boneName); pair == clusterMap.end()) {
-                    cluster = FbxCluster::Create(scene, (meshData.name + "_" + boneName + "_cluster").c_str());
-                    auto skelNode = scene->GetRootNode()->FindChild(boneName.c_str());
-                    cluster->SetLink(skelNode);
-                    //cluster->SetLinkMode(FbxCluster::eAdditive);
-                    clusterMap.insert({boneName, cluster});
-                } else {
-                    cluster = pair->second;
-                }
-
-                cluster->AddControlPointIndex(i, weight);
-            }
-        }
-
-        for (auto pair : clusterMap) {
-            skin->AddCluster(pair.second);
-        }
-
-        mesh->AddDeformer(skin);
-    }*/
-
     std::cout << "Importing normals." << std::endl;
     for (auto normalSet : meshData.normals) {
         std::cout << "Importing Normals Set." << std::endl;
@@ -240,6 +205,46 @@ bool FbxConverter::importMesh(const Badger::Mesh& meshData, size_t meshId) {
         }
     }
 
+    if (!meshData.indices.empty()) {
+        std::cout << "Assigning mesh to bones." << std::endl;
+        auto skin = FbxSkin::Create(scene, (meshData.name + "_skin").c_str());
+
+        std::unordered_map<std::string, FbxCluster*> clusterMap;
+
+        for (auto i = 0; i < meshData.indices.capacity(); i++) {
+            auto boneNames = meshData.indices[i];
+            
+            for (auto j = 0; j < boneNames.capacity(); j++) {
+                auto boneName = boneNames[j];
+                auto weight = meshData.weights[i][j];
+
+                FbxCluster* cluster;
+                if (auto pair = clusterMap.find(boneName); pair == clusterMap.end()) {
+                    cluster = FbxCluster::Create(scene, (meshData.name + "_" + boneName + "_cluster").c_str());
+                    auto skelNode = scene->GetRootNode()->FindChild(boneName.c_str());
+                    cluster->SetLink(skelNode);
+                    cluster->SetLinkMode(FbxCluster::eTotalOne);
+                    clusterMap.insert({boneName, cluster});
+                } else {
+                    cluster = pair->second;
+                }
+
+                cluster->AddControlPointIndex(i, weight);
+            }
+        }
+
+        auto transform = meshNode->EvaluateGlobalTransform();
+
+        for (auto pair : clusterMap) {
+            auto linkTransform = pair.second->GetLink()->EvaluateGlobalTransform();
+            pair.second->SetTransformMatrix(transform);
+            pair.second->SetTransformLinkMatrix(linkTransform);
+            skin->AddCluster(pair.second);
+        }
+
+        mesh->AddDeformer(skin);
+    }
+
     std::cout << "Importing material." << std::endl;
     auto materialLayer = mesh->CreateElementMaterial();
     materialLayer->SetMappingMode(FbxLayerElement::eAllSame);
@@ -260,6 +265,7 @@ bool FbxConverter::importMesh(const Badger::Mesh& meshData, size_t meshId) {
 
 bool FbxConverter::importBone(const Badger::Bone& badgerBone) {
     auto isRootBone = badgerBone.parent.empty();
+    auto skeletonNode = FbxNode::Create(scene, badgerBone.name.c_str());
     auto skeleton = FbxSkeleton::Create(scene, (badgerBone.name + "_bone").c_str());
     if (isRootBone) {
         skeleton->SetSkeletonType(FbxSkeleton::eRoot);
@@ -267,7 +273,7 @@ bool FbxConverter::importBone(const Badger::Bone& badgerBone) {
         skeleton->SetSkeletonType(FbxSkeleton::eLimbNode);
     }
 
-    auto skeletonNode = FbxNode::Create(scene, badgerBone.name.c_str());
+    skeletonNode->SetNodeAttribute(skeleton);
     //skeletonNode->SetNodeAttribute(skeleton);
     skeletonNode->SetRotationActive(true);
     skeletonNode->LclScaling.Set(FbxDouble3(badgerBone.scale[0], badgerBone.scale[1], badgerBone.scale[2]));
@@ -277,7 +283,7 @@ bool FbxConverter::importBone(const Badger::Bone& badgerBone) {
     skeletonNode->LclTranslation.Set(FbxDouble3(badgerBone.pivot[0], badgerBone.pivot[1], badgerBone.pivot[2]));
     skeletonNode->LclRotation.Set(FbxDouble3(badgerBone.info.bindPoseRotation[0], badgerBone.info.bindPoseRotation[1], badgerBone.info.bindPoseRotation[2]));
 
-    skeletonNode->SetTransformationInheritType(FbxTransform::eInheritRSrs);
+    //skeletonNode->SetTransformationInheritType(FbxTransform::eInheritRSrs);
 
     if (!badgerBone.locators.empty()) {
         std::cout << "Importing locators." << std::endl;
