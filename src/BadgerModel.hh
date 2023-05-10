@@ -13,6 +13,8 @@ namespace Badger {
     typedef std::vector<double> Vector3f;
     typedef std::vector<double> Vector2f;
 
+    #pragma region Model Structs
+
     struct BoneInfo {
         Vector3f bindPoseRotation;
     };
@@ -86,27 +88,71 @@ namespace Badger {
         MetaMaterialInfo info;
     };
 
+
+    void from_json(const json& j, BoneInfo& p);
     void to_json(json& j, const BoneInfo& p);
+
+    void from_json(const json& j, Bone& p);
     void to_json(json& j, const Bone& p);
+    
+    void from_json(const json& j, Mesh& p);
     void to_json(json& j, const Mesh& p);
+    
+    void from_json(const json& j, GeometryDescription& p);
     void to_json(json& j, const GeometryDescription& p);
+    
+    void from_json(const json& j, Geometry& p);
     void to_json(json& j, const Geometry& p);
+    
+    void from_json(const json& j, Model& p);
     void to_json(json& j, const Model& p);
+
+    void from_json(const json& j, MetaMaterialTextures& p);
     void to_json(json& j, const MetaMaterialTextures& p);
+
+    void from_json(const json& j, MetaMaterialInfo& p);
     void to_json(json& j, const MetaMaterialInfo& p);
+
+    void from_json(const json& j, MetaMaterial& p);
     void to_json(json& j, const MetaMaterial& p);
 
-    class ModelLoader {
-        public:
-            explicit ModelLoader(const char* resourcePacksFolder);
-            bool loadModel(const char* modelPath);
-            bool loadMaterial(const std::string& name);
-            const MetaMaterial& getMaterial(const std::string& name);
-            const Model& getModel();
-        private:
-            Model model;
-            std::unordered_map<std::string, MetaMaterial> materials;
-            std::vector<std::filesystem::path> resourcePaths;
-            std::vector<std::filesystem::path> materialPaths;
+    #pragma endregion
+
+    #pragma region Entity Structs
+
+    struct FaceAnimation {
+        int colums;
+        int rows;
+        int blinkFrame;
+        int defaultFrame;
     };
+
+    struct EntityComponents {
+        std::optional<FaceAnimation> faceAnimation;
+        std::vector<std::string> templates;
+    };
+
+    struct EntityInfo {
+        EntityComponents components;
+    };
+
+    struct Entity {
+        std::string formatVersion;
+        EntityInfo info;
+        void applyTemplate(const Entity& templateEntity);
+    };
+
+    void from_json(const json& j, Entity& p);
+    void to_json(json& j, const Entity& p);
+
+    void from_json(const json& j, EntityInfo& p);
+    void to_json(json& j, const EntityInfo& p);
+
+    void from_json(const json& j, EntityComponents& p);
+    void to_json(json& j, const EntityComponents& p);
+
+    void from_json(const json& j, FaceAnimation& p);
+    void to_json(json& j, const FaceAnimation& p);
+
+    #pragma endregion
 }

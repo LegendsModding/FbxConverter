@@ -14,7 +14,7 @@ FbxConverter::FbxConverter(const char* resourcePacksDir) {
     ioSettings->SetBoolProp(EXP_FBX_EMBEDDED, true);
 #endif
     manager->SetIOSettings(ioSettings);
-    loader = new Badger::ModelLoader(resourcePacksDir);
+    loader = new ResourceLoader(resourcePacksDir);
     pbShaderImplementation = nullptr;
     scene = nullptr;
 }
@@ -36,15 +36,17 @@ FbxConverter::~FbxConverter() {
 bool FbxConverter::convertToFbx(const char* model, const char* output) {
     std::cout << "Parsing model JSON." << std::endl;
 
-    if (!loader->loadModel(model)) {
+    std::string modelName(model);
+    auto modelData = loader->getModel(modelName);
+    if (!modelData) {
         return false;
     }
-    auto modelData = loader->getModel();
-    if (modelData.geometry.capacity() != 1) {
+
+    if (modelData->geometry.capacity() != 1) {
         std::cerr << "Error: model has more than one geometry - this is not supported." << std::endl;
         return false;
     }
-    auto geometry = modelData.geometry.at(0);
+    auto geometry = modelData->geometry.at(0);
 
     std::cout << "Importing model." << std::endl;
 
@@ -65,7 +67,7 @@ bool FbxConverter::convertToFbx(const char* model, const char* output) {
     auto meshId = 0;
     for (const auto mesh : geometry.meshes) {
         std::cout << "Importing mesh #" << meshId << std::endl;
-        if (!loader->loadMaterial(mesh.material)) {
+        if (!loader->getMaterial(mesh.material)) {
             return false;
         }
 
@@ -75,6 +77,23 @@ bool FbxConverter::convertToFbx(const char* model, const char* output) {
         }
         std::cout << "Finished importing mesh #" << meshId << std::endl;
         meshId++;
+    }
+
+    auto entity = loader->getEntity(modelName);
+    if (entity && entity->info.components.faceAnimation) {
+        std::cout << "Setting UV offset and scale for face material." << std::endl;
+        auto matName = "mat_" + modelName + "_face";
+        if (auto it = createdMaterials.find(matName); it == createdMaterials.end()) {
+            std::cerr << "Failed to find face material " << matName << "." << std::endl;
+            return false;
+        } else {
+            auto faceMaterial = it->second;
+            auto faceAnim = entity->info.components.faceAnimation.value();
+            auto widthOffset = 1.0L / faceAnim.colums;
+            auto heightOffset = 1.0L / faceAnim.rows;
+            faceMaterial->FindPropertyHierarchical("Maya|uv_scale").Set(FbxVector2(widthOffset, heightOffset));
+            faceMaterial->FindPropertyHierarchical("Maya|uv_offset").Set(FbxVector2(widthOffset * faceAnim.defaultFrame, heightOffset * faceAnim.defaultFrame));
+        }
     }
 
     std::cout << "Exporting model." << std::endl;
@@ -328,7 +347,11 @@ FbxSurfaceMaterial* FbxConverter::getMaterial(const std::string& name) {
     std::cout << "Importing material " << name << "." << std::endl;
 
     auto materialData = loader->getMaterial(name);
-    auto materialInfo = materialData.info.textures;
+    if (!materialData) {
+        return nullptr;
+    }
+
+    auto materialInfo = materialData->info.textures;
 
     auto useColorMap = !materialInfo.diffuse.empty();
     auto useNormalMap = !materialInfo.normal.empty();
@@ -338,7 +361,7 @@ FbxSurfaceMaterial* FbxConverter::getMaterial(const std::string& name) {
     // Creating properties for Stingray PBS material
     // Done this way to ensure same order as in a Maya export
 
-    auto mayaMatName = materialData.baseName.empty() ? materialData.name : (materialData.name + "___" + materialData.baseName);
+    auto mayaMatName = materialData->baseName.empty() ? materialData->name : (materialData->name + "___" + materialData->baseName);
 
     auto material = FbxSurfaceMaterial::Create(scene, mayaMatName.c_str());
     auto mayaProperty = FbxProperty::Create(material, FbxCompoundDT, "Maya", "");

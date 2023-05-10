@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BadgerModel.hh"
+#include "ResourceLoader.hh"
 
 #include <vector>
 #include <fbxsdk.h>
@@ -18,7 +19,7 @@ class FbxConverter {
         FbxSurfaceMaterial* getMaterial(const std::string& name);
         FbxManager* manager;
         FbxScene* scene;
-        Badger::ModelLoader* loader;
+        ResourceLoader* loader;
         std::unordered_map<std::string, FbxSurfaceMaterial*> createdMaterials;
         FbxImplementation* pbShaderImplementation;
 };

@@ -2,12 +2,16 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <vector>
 
 #include "BadgerModel.hh"
 
 using json = nlohmann::json;
 
 namespace Badger {
+
+    #pragma region Model Structs
+
     void from_json(const nlohmann::json& j, BoneInfo& p) {
         j.at("bind_pose_rotation").get_to(p.bindPoseRotation);
     }
@@ -189,111 +193,77 @@ namespace Badger {
         j[matName] = p.info;
     }
 
+    #pragma endregion
+    #pragma region Entity Structs
 
-    ModelLoader::ModelLoader(const char* resourcePacks) {
-        std::filesystem::path resourcePacksDir(resourcePacks);
-        for (auto entry : std::filesystem::directory_iterator(resourcePacks)) {
-            if (entry.is_directory()) {
-                resourcePaths.push_back(entry);
-                auto materialsPath = std::filesystem::path(entry);
-                materialsPath /= "materials";
-                materialsPath /= "meta_materials";
-                materialPaths.push_back(materialsPath);
+    void from_json(const json& j, Entity& p) {
+        j.at("format_version").get_to(p.formatVersion);
+        j.at("minecraft:client_entity").get_to(p.info);
+    }
+
+    void to_json(json& j, const Entity& p) {
+        j = json {
+            {"format_version", p.formatVersion},
+            {"minecraft:client_entity", p.info}
+        };
+    }
+
+    void from_json(const json& j, EntityInfo& p) {
+        j.at("components").get_to(p.components);
+    }
+
+    void to_json(json& j, const EntityInfo& p) {
+        j = json {
+            {"components", p.components}
+        };
+    }
+
+    void from_json(const json& j, EntityComponents& p) {
+        if (j.contains("badger:face_animation")) 
+            p.faceAnimation = j.at("badger:face_animation").get<Badger::FaceAnimation>();
+        if (j.contains("badger:template")) {
+            auto templateObj = j.at("badger:template");
+            if (templateObj.is_string()) {
+                p.templates.push_back(templateObj.get<std::string>());
+            } else {
+                templateObj.get_to(p.templates);
             }
         }
     }
 
-    bool ModelLoader::loadModel(const char* model) {
-        const std::filesystem::path modelPath(model);
+    void to_json(json& j, const EntityComponents& p) {
+        j = json {};
+        if (p.faceAnimation)
+            j["badger:face_animation"] = p.faceAnimation.value();
 
-        if (!std::filesystem::exists(modelPath)) {
-            std::cerr << "Error: model.json does not exist." << std::endl;
-            return false;
-        }
-
-        std::ifstream modelStream(modelPath, std::ios::in);
-        if (!modelStream) {
-            std::cerr << "Error: could not open model JSON." << std::endl;
-            return false;
-        }
-
-        try {
-            auto modelJson = json::parse(modelStream);
-            this->model = modelJson.get<Model>();
-            return true;
-        } catch (json::exception e) {
-            std::cerr << "Error: failed to parse model JSON. Exception: " << e.what() << std::endl;
-            return false;
+        if (!p.templates.empty()) {
+            if (p.templates.capacity() == 1)
+                j["badger:template"] = p.templates[0];
+            else
+                j["badger:template"] = p.templates;
         }
     }
 
-    bool ModelLoader::loadMaterial(const std::string& materialName) {
-        if (materials.contains(materialName))
-            return true;
-
-        auto filename = materialName + ".json";
-
-        auto i = 0;
-        for (auto materialPath : materialPaths) {
-            auto resourcePathIndex = i++;
-            materialPath /= filename;
-
-            if (!std::filesystem::exists(materialPath)) {
-                continue;
-            }
-
-            std::ifstream materialStream(materialPath, std::ios::in);
-            if (!materialStream) {
-                std::cerr << "Error: could not open material JSON. Material: " << materialName << std::endl;
-                return false;
-            }
-
-            try {
-                auto modelJson = json::parse(materialStream);
-                auto material = modelJson.get<MetaMaterial>();
-                auto resourcePath = resourcePaths.at(resourcePathIndex);
-                if (!std::filesystem::exists(std::filesystem::path(resourcePath) / material.info.textures.diffuse)) {
-                    auto texFound = false;
-                    for (auto it : resourcePaths) {
-                        if (std::filesystem::exists(std::filesystem::path(it) / (material.info.textures.diffuse + ".png"))) {
-                            texFound = true;
-                            resourcePath = it;
-                            break;
-                        }
-                    }
-
-                    if (!texFound) {
-                        std::cerr << "Error: could not find texture " << material.info.textures.diffuse << ".png in any resource pack." << std::endl;
-                        return false;
-                    }
-                }
-
-                if (!material.info.textures.diffuse.empty())
-                    material.info.textures.diffuse = (std::filesystem::path(resourcePath) / material.info.textures.diffuse).string();
-                if (!material.info.textures.coeff.empty())
-                    material.info.textures.coeff = (std::filesystem::path(resourcePath) / material.info.textures.coeff).string();          
-                if (!material.info.textures.emissive.empty())
-                    material.info.textures.emissive = (std::filesystem::path(resourcePath) / material.info.textures.emissive).string();
-                if (!material.info.textures.normal.empty())
-                    material.info.textures.normal = (std::filesystem::path(resourcePath) / material.info.textures.normal).string();
-
-                materials.insert({materialName, material});
-                return true;
-            } catch (json::exception e) {
-                std::cerr << "Error: failed to parse material JSON. Exception: " << e.what() << std::endl;
-                return false;
-            }
-        }
-
-        std::cerr << "Error: material JSON does not exist. Material: " << materialName << std::endl;
-        return false;
+    void from_json(const json& j, FaceAnimation& p) {
+        j.at("anim_columns").get_to(p.colums);
+        j.at("anim_rows").get_to(p.rows);
+        j.at("blink_frame").get_to(p.blinkFrame);
+        j.at("default_frame").get_to(p.defaultFrame);
     }
 
-    const MetaMaterial& ModelLoader::getMaterial(const std::string& name) {
-        return materials.at(name);
+    void to_json(json& j, const FaceAnimation& p) {
+        j = json {
+            {"anim_columns", p.colums},
+            {"anim_rows", p.rows},
+            {"blink_frame", p.blinkFrame},
+            {"default_frame", p.defaultFrame}
+        };
     }
 
-    const Model& ModelLoader::getModel() {
-        return model;
+    #pragma endregion
+
+    void Entity::applyTemplate(const Entity& templateEntity) {
+        if (!info.components.faceAnimation && templateEntity.info.components.faceAnimation)
+            info.components.faceAnimation = templateEntity.info.components.faceAnimation;
     }
 }
