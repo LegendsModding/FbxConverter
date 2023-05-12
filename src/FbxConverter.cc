@@ -29,8 +29,7 @@ FbxConverter::~FbxConverter() {
     if (manager != nullptr)
         manager->Destroy();
 
-    if (loader != nullptr)
-        delete loader;
+    delete loader;
 }
 
 bool FbxConverter::convertToFbx(const char* model, const char* output) {
@@ -54,7 +53,7 @@ bool FbxConverter::convertToFbx(const char* model, const char* output) {
 
     std::cout << "Importing bones." << std::endl;
 
-    for (auto bone : geometry.bones) {
+    for (const auto& bone : geometry.bones) {
         std::cout << "Importing bone " << bone.name << std::endl;
         if (!importBone(bone)) {
             std::cerr << "Error: failed to import bone." << std::endl;
@@ -65,7 +64,7 @@ bool FbxConverter::convertToFbx(const char* model, const char* output) {
     std::cout << "Importing meshes." << std::endl;
 
     auto meshId = 0;
-    for (const auto mesh : geometry.meshes) {
+    for (const auto& mesh : geometry.meshes) {
         std::cout << "Importing mesh #" << meshId << std::endl;
         if (!loader->getMaterial(mesh.material)) {
             return false;
@@ -89,8 +88,8 @@ bool FbxConverter::convertToFbx(const char* model, const char* output) {
         } else {
             auto faceMaterial = it->second;
             auto faceAnim = entity->info.components.faceAnimation.value();
-            auto widthOffset = 1.0L / faceAnim.colums;
-            auto heightOffset = 1.0L / faceAnim.rows;
+            auto widthOffset = 1.0 / faceAnim.colums;
+            auto heightOffset = 1.0 / faceAnim.rows;
             faceMaterial->FindPropertyHierarchical("Maya|uv_scale").Set(FbxVector2(widthOffset, heightOffset));
             faceMaterial->FindPropertyHierarchical("Maya|uv_offset").Set(FbxVector2(widthOffset * faceAnim.defaultFrame, heightOffset * faceAnim.defaultFrame));
         }
@@ -158,10 +157,10 @@ bool FbxConverter::importMesh(const Badger::Mesh& meshData, size_t meshId) {
     mesh->InitControlPoints(meshData.positions.capacity());
     auto controlPoints = mesh->GetControlPoints();
 
-    auto i = 0;
-    for (auto pos : meshData.positions) {
+
+    for (auto i = 0; i < meshData.positions.capacity(); i++) {
+        auto pos = meshData.positions[i];
         controlPoints[i] = FbxVector4(pos[0], pos[1], pos[2]);
-        i++;
     }
 
     std::cout << "Importing polygons." << std::endl;
@@ -174,7 +173,7 @@ bool FbxConverter::importMesh(const Badger::Mesh& meshData, size_t meshId) {
     }
 
     std::cout << "Importing normals." << std::endl;
-    for (auto normalSet : meshData.normals) {
+    for (const auto& normalSet : meshData.normals) {
         std::cout << "Importing Normals Set." << std::endl;
 
         if (positionsCount != normalSet.capacity()) {
@@ -191,7 +190,7 @@ bool FbxConverter::importMesh(const Badger::Mesh& meshData, size_t meshId) {
     }
 
     std::cout << "Importing UVs." << std::endl;
-    for (auto uvSet : meshData.uvs) {
+    for (const auto& uvSet : meshData.uvs) {
         std::cout << "Importing UV Set." << std::endl;
 
         if (positionsCount != uvSet.capacity()) {
@@ -208,7 +207,7 @@ bool FbxConverter::importMesh(const Badger::Mesh& meshData, size_t meshId) {
     }
 
     std::cout << "Importing colors." << std::endl;
-    for (auto colorSet : meshData.colors) {
+    for (const auto& colorSet : meshData.colors) {
         std::cout << "Importing color set." << std::endl;
 
         if (positionsCount != colorSet.capacity()) {
@@ -307,7 +306,7 @@ bool FbxConverter::importBone(const Badger::Bone& badgerBone) {
     if (!badgerBone.locators.empty()) {
         std::cout << "Importing locators." << std::endl;
 
-        for (auto locatorPair : badgerBone.locators) {
+        for (const auto& locatorPair : badgerBone.locators) {
             auto info = locatorPair.second;
             auto locator = FbxNull::Create(scene, (locatorPair.first + "_locator").c_str());
             auto locatorNode = FbxNode::Create(scene, locatorPair.first.c_str());

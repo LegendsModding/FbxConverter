@@ -8,7 +8,7 @@
 #include <optional>
 
 ResourceLoader::ResourceLoader(const char* resourcePacksDirectory) {
-    for (auto entry : std::filesystem::directory_iterator(resourcePacksDirectory)) {
+    for (const auto& entry : std::filesystem::directory_iterator(resourcePacksDirectory)) {
         if (entry.is_directory()) {
             resourcePacks.push_back(entry);
         }
@@ -16,21 +16,21 @@ ResourceLoader::ResourceLoader(const char* resourcePacksDirectory) {
 }
 
 std::optional<const Badger::Model> ResourceLoader::getModel(const std::string& name) {
-    if (auto it = modelCache.find(name); it != modelCache.end())
+    if (const auto& it = modelCache.find(name); it != modelCache.end())
         return it->second;
 
     return loadModel(name);
 }
 
 std::optional<const Badger::MetaMaterial> ResourceLoader::getMaterial(const std::string& name) {
-    if (auto it = materialCache.find(name); it != materialCache.end())
+    if (const auto& it = materialCache.find(name); it != materialCache.end())
         return it->second;
 
     return loadMaterial(name);
 }
 
 std::optional<const Badger::Entity> ResourceLoader::getEntity(const std::string& name) {
-    if (auto it = entityCache.find(name); it != entityCache.end())
+    if (const auto& it = entityCache.find(name); it != entityCache.end())
         return it->second;
 
     return loadEntity(name);
@@ -38,7 +38,7 @@ std::optional<const Badger::Entity> ResourceLoader::getEntity(const std::string&
 
 std::optional<const Badger::Model> ResourceLoader::loadModel(const std::string& name) {
     auto filename = name + ".model.json";
-    for (auto packDirectory : resourcePacks) {
+    for (const auto& packDirectory : resourcePacks) {
         auto modelPath = packDirectory / "models" / "entity" / filename;
         if (!std::filesystem::exists(modelPath)) {
             continue;
@@ -76,7 +76,7 @@ std::optional<const Badger::Model> ResourceLoader::loadModel(const std::string& 
             };
             modelCache.insert({name, model});
             return model;
-        } catch (json::exception e) {
+        } catch (json::exception& e) {
             std::cerr << "Error: failed to parse json (" << e.what() << ")" << std::endl;
             return {};
         }
@@ -88,7 +88,7 @@ std::optional<const Badger::Model> ResourceLoader::loadModel(const std::string& 
 
 std::optional<const Badger::MetaMaterial> ResourceLoader::loadMaterial(const std::string& name) {
     auto filename = name + ".json";
-    for (auto packDirectory : resourcePacks) {
+    for (const auto& packDirectory : resourcePacks) {
         auto materialPath = packDirectory / "materials" / "meta_materials" / filename;
         if (!std::filesystem::exists(materialPath)) {
             continue;
@@ -106,13 +106,13 @@ std::optional<const Badger::MetaMaterial> ResourceLoader::loadMaterial(const std
             auto texturePackDirectory = packDirectory;
             if (!std::filesystem::exists(texturePackDirectory / material.info.textures.diffuse)) {
                 auto texturesFound = false;
-                for (auto textureDirectory : resourcePacks) {
+                for (const auto& textureDirectory : resourcePacks) {
                     if (std::filesystem::exists(textureDirectory / (material.info.textures.diffuse + ".png"))) {
                         texturesFound = true;
                         texturePackDirectory = textureDirectory;
                         break;
                     }
-                };
+                }
 
                 if (!texturesFound) {
                     std::cerr << "Error: failed to find texture " << material.info.textures.diffuse << " in any resource pack." << std::endl;
@@ -132,7 +132,7 @@ std::optional<const Badger::MetaMaterial> ResourceLoader::loadMaterial(const std
             // TODO: Add base material importing
             materialCache.insert({name, material});
             return material;
-        } catch (json::exception e) {
+        } catch (json::exception& e) {
             std::cerr << "Error: failed to parse json (" << e.what() << ")" << std::endl;
             return {};
         }
@@ -144,7 +144,7 @@ std::optional<const Badger::MetaMaterial> ResourceLoader::loadMaterial(const std
 
 std::optional<const Badger::Entity> ResourceLoader::loadEntity(const std::string& name) {
     auto filename = name + ".entity.json";
-    for (auto packDirectory : resourcePacks) {
+    for (const auto& packDirectory : resourcePacks) {
         auto path = packDirectory / "entity" / filename;
         if (!std::filesystem::exists(path)) {
             continue;
@@ -159,7 +159,7 @@ std::optional<const Badger::Entity> ResourceLoader::loadEntity(const std::string
         try {
             auto entity = json::parse(file).get<Badger::Entity>();
             if (!entity.info.components.templates.empty()) {
-                for (auto parent : entity.info.components.templates) {
+                for (const auto& parent : entity.info.components.templates) {
                     auto parentEntity = getEntity(parent.substr(parent.find(':') + 1));
                     if (!parentEntity) {
                         return {};
@@ -170,7 +170,7 @@ std::optional<const Badger::Entity> ResourceLoader::loadEntity(const std::string
 
             entityCache.insert({name, entity});
             return entity;
-        } catch (json::exception e) {
+        } catch (json::exception& e) {
             std::cerr << "Error: failed to parse json (" << e.what() << ")" << std::endl;
             return {};
         }

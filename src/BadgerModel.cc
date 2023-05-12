@@ -1,8 +1,6 @@
 
-#include <iostream>
 #include <fstream>
 #include <string>
-#include <vector>
 
 #include "BadgerModel.hh"
 
@@ -12,23 +10,23 @@ namespace Badger {
 
     #pragma region Model Structs
 
-    void from_json(const nlohmann::json& j, BoneInfo& p) {
+    [[maybe_unused]] void from_json(const nlohmann::json& j, BoneInfo& p) {
         j.at("bind_pose_rotation").get_to(p.bindPoseRotation);
     }
 
-    void to_json(json& j, const BoneInfo& p) {
+    [[maybe_unused]] void to_json(json& j, const BoneInfo& p) {
         j = json {
             {"bind_pose_rotation", p.bindPoseRotation}
         };
     }
 
-    void from_json(const nlohmann::json& j, BoneLocator& p) {
+    [[maybe_unused]] void from_json(const nlohmann::json& j, BoneLocator& p) {
         j.at("discard_scale").get_to(p.discardScale);
         j.at("offset").get_to(p.offset);
         j.at("rotation").get_to(p.rotation);
     }
 
-    void to_json(json& j, const BoneLocator& p) {
+    [[maybe_unused]] void to_json(json& j, const BoneLocator& p) {
         j = json {
             {"discard_scale", p.discardScale},
             {"offset", p.offset},
@@ -36,7 +34,7 @@ namespace Badger {
         };
     }
 
-    void from_json(const json& j, Bone& p) {
+    [[maybe_unused]] void from_json(const json& j, Bone& p) {
         j.at("\x1\x2\x3\x4\x5__").get_to(p.info);
         if (j.contains("locators")) j.at("locators").get_to(p.locators);
         j.at("name").get_to(p.name);
@@ -45,7 +43,7 @@ namespace Badger {
         j.at("scale").get_to(p.scale);
     }
 
-    void to_json(json& j, const Bone& p) {
+    [[maybe_unused]] void to_json(json& j, const Bone& p) {
         j = json {
             {"\x1\x2\x3\x4\x5__", p.info},
             {"name", p.name},
@@ -58,7 +56,7 @@ namespace Badger {
             j["locators"] = p.locators;
     }
 
-    void from_json(const json& j, Mesh& p) {
+    [[maybe_unused]] void from_json(const json& j, Mesh& p) {
         if (j.contains("indices")) j.at("indices").get_to(p.indices);
         if (j.contains("color_sets")) j.at("color_sets").get_to(p.colors);
         if (j.contains("model_name")) j.at("model_name").get_to(p.name);
@@ -70,7 +68,7 @@ namespace Badger {
         j.at("weights").get_to(p.weights);
     }
 
-    void to_json(json& j, const Mesh& p) {
+    [[maybe_unused]] void to_json(json& j, const Mesh& p) {
         j = json {
             {"meta_material", p.material},
             {"normal_sets", p.normals},
@@ -90,23 +88,23 @@ namespace Badger {
             j["indices"] = p.indices;
     }
 
-    void from_json(const json& j, GeometryDescription& p) {
+    [[maybe_unused]] void from_json(const json& j, GeometryDescription& p) {
         j.at("identifier").get_to(p.identifier);
     }
 
-    void to_json(json& j, const GeometryDescription& p) {
+    [[maybe_unused]] void to_json(json& j, const GeometryDescription& p) {
         j = json {
             {"identifier", p.identifier},
         };
     }
 
-    void from_json(const json& j, Geometry& p) {
+    [[maybe_unused]] void from_json(const json& j, Geometry& p) {
         j.at("bones").get_to(p.bones);
         j.at("meshes").get_to(p.meshes);
         j.at("description").get_to(p.description);
     }
 
-    void to_json(json& j, const Geometry& p) {
+    [[maybe_unused]] void to_json(json& j, const Geometry& p) {
         j = json {
             {"bones", p.bones},
             {"meshes", p.meshes},
@@ -114,19 +112,19 @@ namespace Badger {
         };
     }
 
-    void from_json(const json& j, Model& p) {
+    [[maybe_unused]] void from_json(const json& j, Model& p) {
         j.at("format_version").get_to(p.formatVersion);
         j.at("minecraft:geometry").get_to(p.geometry);
     }
 
-    void to_json(json& j, const Model& p) {
+    [[maybe_unused]] void to_json(json& j, const Model& p) {
         j = json {
             {"format_version", p.formatVersion},
             {"minecraft:geometry", p.geometry}
         };
     }
 
-    void from_json(const json& j, MetaMaterialTextures& p) {
+    [[maybe_unused]] void from_json(const json& j, MetaMaterialTextures& p) {
         if (j.contains("diffuseMap")) j.at("diffuseMap").get_to(p.diffuse);
         else p.diffuse = std::string();
 
@@ -140,7 +138,7 @@ namespace Badger {
         else p.normal = std::string();
     }
 
-    void to_json(json& j, const MetaMaterialTextures& p) {
+    [[maybe_unused]] void to_json(json& j, const MetaMaterialTextures& p) {
         j = json {};
         if (!p.diffuse.empty())
             j["diffuseMap"] = p.diffuse;
@@ -152,13 +150,13 @@ namespace Badger {
             j["normalMap"] = p.normal;
     }
 
-    void from_json(const json& j, MetaMaterialInfo& p) {
+    [[maybe_unused]] void from_json(const json& j, MetaMaterialInfo& p) {
         if (j.contains("material")) j.at("material").get_to(p.material);
         if (j.contains("culling")) j.at("culling").get_to(p.culling);
         j.at("textures").get_to(p.textures);
     }
 
-    void to_json(json& j, const MetaMaterialInfo& p) {
+    [[maybe_unused]] void to_json(json& j, const MetaMaterialInfo& p) {
         j = json {
             {"textures", p.textures}
         };
@@ -169,11 +167,11 @@ namespace Badger {
             j["culling"] = p.culling;
     }
 
-    void from_json(const json& j, MetaMaterial& p) {
+    [[maybe_unused]] void from_json(const json& j, MetaMaterial& p) {
         j.at("format_version").get_to(p.formatVersion);
         for (auto it = ++j.begin(); it != j.end(); ++it) {
-            auto matName = it.key();
-            auto matNameDelim = matName.rfind(":"); 
+            const auto& matName = it.key();
+            auto matNameDelim = matName.rfind(':');
             if (matNameDelim != std::string::npos) {
                 p.name = matName.substr(0, matNameDelim);
                 p.baseName = matName.substr(matNameDelim + 1);
@@ -184,7 +182,7 @@ namespace Badger {
         }
     }
 
-    void to_json(json& j, const MetaMaterial& p) {
+    [[maybe_unused]] void to_json(json& j, const MetaMaterial& p) {
         j = json {
             {"format_version", p.formatVersion}
         };
@@ -196,33 +194,33 @@ namespace Badger {
     #pragma endregion
     #pragma region Entity Structs
 
-    void from_json(const json& j, Entity& p) {
+    [[maybe_unused]] void from_json(const json& j, Entity& p) {
         j.at("format_version").get_to(p.formatVersion);
         j.at("minecraft:client_entity").get_to(p.info);
     }
 
-    void to_json(json& j, const Entity& p) {
+    [[maybe_unused]] void to_json(json& j, const Entity& p) {
         j = json {
             {"format_version", p.formatVersion},
             {"minecraft:client_entity", p.info}
         };
     }
 
-    void from_json(const json& j, EntityInfo& p) {
+    [[maybe_unused]] void from_json(const json& j, EntityInfo& p) {
         j.at("components").get_to(p.components);
     }
 
-    void to_json(json& j, const EntityInfo& p) {
+    [[maybe_unused]] void to_json(json& j, const EntityInfo& p) {
         j = json {
             {"components", p.components}
         };
     }
 
-    void from_json(const json& j, EntityComponents& p) {
+    [[maybe_unused]] void from_json(const json& j, EntityComponents& p) {
         if (j.contains("badger:face_animation")) 
             p.faceAnimation = j.at("badger:face_animation").get<Badger::FaceAnimation>();
         if (j.contains("badger:template")) {
-            auto templateObj = j.at("badger:template");
+            const auto& templateObj = j.at("badger:template");
             if (templateObj.is_string()) {
                 p.templates.push_back(templateObj.get<std::string>());
             } else {
@@ -231,7 +229,7 @@ namespace Badger {
         }
     }
 
-    void to_json(json& j, const EntityComponents& p) {
+    [[maybe_unused]] void to_json(json& j, const EntityComponents& p) {
         j = json {};
         if (p.faceAnimation)
             j["badger:face_animation"] = p.faceAnimation.value();
@@ -244,14 +242,14 @@ namespace Badger {
         }
     }
 
-    void from_json(const json& j, FaceAnimation& p) {
+    [[maybe_unused]] void from_json(const json& j, FaceAnimation& p) {
         j.at("anim_columns").get_to(p.colums);
         j.at("anim_rows").get_to(p.rows);
         j.at("blink_frame").get_to(p.blinkFrame);
         j.at("default_frame").get_to(p.defaultFrame);
     }
 
-    void to_json(json& j, const FaceAnimation& p) {
+    [[maybe_unused]] void to_json(json& j, const FaceAnimation& p) {
         j = json {
             {"anim_columns", p.colums},
             {"anim_rows", p.rows},

@@ -2,13 +2,12 @@
 
 #include <iostream>
 #include <fstream>
-#include <algorithm>
 
 BadgerConverter::BadgerConverter() : model() {
     manager = FbxManager::Create();
     auto ioSettings = FbxIOSettings::Create(manager, IOSROOT);
     manager->SetIOSettings(ioSettings);
-    scene = nullptr;
+    scene = FbxScene::Create(manager, "ExportedScene");
 
     model.formatVersion = "1.14.0";
 }
@@ -27,7 +26,6 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
         return false;
     }
 
-    scene = FbxScene::Create(manager, "ExportedScene");
     importer->Import(scene);
     importer->Destroy();
 
@@ -50,7 +48,7 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
             continue;
         }
 
-        auto mesh = static_cast<FbxMesh*>(attribute);
+        auto mesh = dynamic_cast<FbxMesh*>(attribute);
         if (!exportMesh(geometry, mesh, child)) {
             std::cerr << "Error: failed to export mesh." << std::endl;
             return false;
@@ -101,7 +99,7 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
     std::filesystem::create_directories(materialDir);
 
     std::ofstream materialOutputStream;
-    for (auto pair : exportedMaterials) {
+    for (const auto& pair : exportedMaterials) {
         auto materialOutputPath = std::filesystem::path(materialDir);
         materialOutputPath /= (pair.first + ".json");
         json materialJson(pair.second);
@@ -224,10 +222,7 @@ bool BadgerConverter::exportMesh(Badger::Geometry& geometry, const FbxMesh* mesh
     auto material = node->GetMaterial(materialIndex);
     badgerMesh.material = material->GetName();
 
-    if (!exportMaterial(material)) {
-        std::cerr << "Error: failed to export material." << std::endl;
-        return false;
-    }
+    exportMaterial(material);
 
     geometry.meshes.push_back(badgerMesh);
 

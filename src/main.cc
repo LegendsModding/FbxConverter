@@ -1,18 +1,12 @@
 #include <iostream>
-#include <filesystem>
 #include <fstream>
 #include <string>
 
 //#define USE_ASSIMP
 
-#include <nlohmann/json.hpp>
-#include <fbxsdk.h>
-
 #include "FbxConverter.hh"
 #include "BadgerConverter.hh"
 #include "AssimpConverter.hh"
-
-#include <string>
 
 int main(int argc, char** argv)
 {
@@ -29,7 +23,6 @@ int main(int argc, char** argv)
         std::cout << "Usage: " << argv[0] << " <command> <arguments>" << std::endl;
         std::cout << "Command 'export': <path to resource packs> <model name> <path to output .fbx>" << std::endl;
         std::cout << "Command 'import': <path to input fbx> <output folder>" << std::endl;
-        //std::cout << "Usage: " << argv[0] << "<path to resource pack> <path to model.json> <path to output .fbx>" << std::endl;
         return -1;
     }
 
