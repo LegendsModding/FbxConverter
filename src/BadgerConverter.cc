@@ -94,6 +94,8 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
     std::filesystem::create_directories(outputPath);
 
     std::filesystem::path modelOutput(outputPath);
+    modelOutput = modelOutput / "models" / "entity";
+    std::filesystem::create_directories(modelOutput);
     modelOutput /= (fbxFilename + ".model.json");
 
     std::ofstream modelOutputStream(modelOutput, std::ios::out);
@@ -109,8 +111,30 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
     materialDir /= "materials";
     std::filesystem::create_directories(materialDir);
 
+    auto textureDir = std::filesystem::path(outputDirectory) / "textures" / "entity";
+    std::filesystem::create_directories(textureDir);
+
+    auto copyAndRedirectTexture = [&](std::string& path) {
+        std::filesystem::path originalTexPath(path);
+        std::filesystem::path newTexPath(textureDir);
+        newTexPath /= originalTexPath.filename();
+
+        std::filesystem::copy(originalTexPath, newTexPath);
+
+        path = "textures/entity/" + originalTexPath.stem().string();
+    };
+
     std::ofstream materialOutputStream;
-    for (const auto& pair : exportedMaterials) {
+    for (auto& pair : exportedMaterials) {
+        if (!pair.second.info.textures.diffuse.empty())
+            copyAndRedirectTexture(pair.second.info.textures.diffuse);
+        if (!pair.second.info.textures.coeff.empty())
+            copyAndRedirectTexture(pair.second.info.textures.coeff);
+        if (!pair.second.info.textures.normal.empty())
+            copyAndRedirectTexture(pair.second.info.textures.normal);
+        if (!pair.second.info.textures.emissive.empty())
+            copyAndRedirectTexture(pair.second.info.textures.emissive);
+
         auto materialOutputPath = std::filesystem::path(materialDir);
         materialOutputPath /= (pair.second.name + ".json");
         json materialJson(pair.second);
