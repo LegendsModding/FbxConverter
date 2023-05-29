@@ -13,6 +13,7 @@ class BadgerConverter {
         bool convertToBadger(const char* fbx, const char* outputFolder);
     private:
         bool exportMesh(Badger::Geometry& geometry, const FbxMesh* mesh, const FbxNode* node);
+        bool exportBone(Badger::Geometry& geometry, const FbxSkeleton* skeleton, const FbxNode* node);
         bool exportMaterial(const FbxSurfaceMaterial* material);
         FbxManager* manager;
         FbxScene* scene;

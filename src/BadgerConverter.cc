@@ -29,29 +29,39 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
     importer->Import(scene);
     importer->Destroy();
 
+    std::cout << "Imported fbx." << std::endl;
+
     Badger::Geometry geometry;
     geometry.description.identifier = "geometry." + fbxFilename;
 
     auto root = scene->GetRootNode();
-    auto meshCount = root->GetChildCount();
+    auto nodeCount = root->GetChildCount();
 
-    std::cout << "Exporting " << meshCount << " meshes." << std::endl;
-
-    for (auto i = 0; i < meshCount; i++) {
+    for (auto i = 0; i < nodeCount; i++) {
         auto child = root->GetChild(i);
         auto attribute = child->GetNodeAttribute();
         if (attribute == nullptr) {
             continue;
         }
 
-        if (attribute->GetAttributeType() != FbxNodeAttribute::eMesh) {
-            continue;
-        }
+        auto type = attribute->GetAttributeType();
 
-        auto mesh = dynamic_cast<FbxMesh*>(attribute);
-        if (!exportMesh(geometry, mesh, child)) {
-            std::cerr << "Error: failed to export mesh." << std::endl;
-            return false;
+        if (type == FbxNodeAttribute::eSkeleton) {
+            std::cout << "Exporting bones." << std::endl;
+
+            FbxSkeleton* bone = FbxCast<FbxSkeleton>(attribute);
+            if (!exportBone(geometry, bone, child)) {
+                std::cerr << "Error: failed to export bone." << std::endl;
+                return false;
+            }
+        } else if (type == FbxNodeAttribute::eMesh) {
+            std::cout << "Exporting mesh." << std::endl;
+
+            FbxMesh* mesh = FbxCast<FbxMesh>(attribute);
+            if (!exportMesh(geometry, mesh, child)) {
+                std::cerr << "Error: failed to export mesh." << std::endl;
+                return false;
+            }
         }
     }
 
@@ -92,7 +102,8 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
     modelOutputStream << modelJson;
     modelOutputStream.close();
 
-    std::cout << "Creating material JSONs." << std::endl;
+    // TODO
+    /*std::cout << "Creating material JSONs." << std::endl;
 
     auto materialDir = std::filesystem::path(outputDirectory);
     materialDir /= "materials";
@@ -106,7 +117,9 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
         materialOutputStream.open(materialOutputPath);
         materialOutputStream << materialJson;
         materialOutputStream.close();
-    }
+    }*/
+
+    std::cout << "Export finished." << std::endl;
 
     return true;
 }
@@ -117,14 +130,12 @@ bool BadgerConverter::exportMesh(Badger::Geometry& geometry, const FbxMesh* mesh
     badgerMesh.positions.reserve(controlPointCount);
     badgerMesh.weights.reserve(controlPointCount);
 
-    std::cout << "Exporting positions and weights." << std::endl;
+    std::cout << "Exporting positions." << std::endl;
 
     for (auto i = 0; i < controlPointCount; i++) {
         double* controlPoint = mesh->GetControlPoints()[i];
         std::vector<double> position{&controlPoint[0], &controlPoint[3]};
         badgerMesh.positions.push_back(position);
-        badgerMesh.weights.push_back({controlPoint[3]});
-
     }
 
     std::cout << "Exporting triangles." << std::endl;
@@ -208,6 +219,40 @@ bool BadgerConverter::exportMesh(Badger::Geometry& geometry, const FbxMesh* mesh
         }
     }
 
+
+    auto deformer = mesh->GetDeformer(0);
+    if (deformer != nullptr && deformer->GetDeformerType() == FbxDeformer::eSkin) {
+        std::cout << "Exporting skin information." << std::endl;
+        FbxSkin* skin = FbxCast<FbxSkin>(deformer);
+
+        badgerMesh.weights.resize(controlPointCount);
+        badgerMesh.indices.resize(controlPointCount);
+
+        for (auto i = 0; i < skin->GetClusterCount(); i++) {
+            FbxCluster* cluster = skin->GetCluster(i);
+            auto link = cluster->GetLink();
+            if (link == nullptr) {
+                std::cerr << "Error: skin cluster had no bone linked to it." << std::endl;
+                return false;
+            }
+
+            auto weightsPointer = cluster->GetControlPointWeights();
+
+            if (cluster->GetControlPointIndicesCount() != controlPointCount
+                || weightsPointer == nullptr) {
+                std::cerr << "Error: skin cluster weight count did not match control point count." << std::endl;
+                return false;
+            }
+
+            auto boneName = link->GetName();
+
+            for (auto j = 0; j < controlPointCount; j++) {
+                badgerMesh.indices.at(j).push_back(boneName);
+                badgerMesh.weights.at(j).push_back(weightsPointer[j]);
+            }
+        }
+    }
+
     std::cout << "Exporting material." << std::endl;
 
     auto materialCount = mesh->GetElementMaterialCount();
@@ -220,9 +265,10 @@ bool BadgerConverter::exportMesh(Badger::Geometry& geometry, const FbxMesh* mesh
 
     auto materialIndex = mesh->GetElementMaterial()->GetIndexArray().GetFirst();
     auto material = node->GetMaterial(materialIndex);
-    badgerMesh.material = material->GetName();
 
     exportMaterial(material);
+
+    badgerMesh.material = exportedMaterials.at(material->GetName()).name;
 
     geometry.meshes.push_back(badgerMesh);
 
@@ -248,5 +294,56 @@ bool BadgerConverter::exportMaterial(const FbxSurfaceMaterial* material) {
     materialInfo.culling = "none";
 
     exportedMaterials.insert({name, metaMaterial});
+    return true;
+}
+
+bool BadgerConverter::exportBone(Badger::Geometry& geometry, const FbxSkeleton* skeleton, const FbxNode* node) {    
+    auto convertVector = [&](FbxDouble3 vec) -> std::vector<double> {
+        return std::vector<double>(&vec[0], &vec[3]);
+    };
+    
+    Badger::Bone badgerBone {};
+    badgerBone.name = node->GetName();
+
+    badgerBone.scale = convertVector(node->LclScaling.Get());
+    badgerBone.pivot = convertVector(node->LclTranslation.Get());
+    badgerBone.info.bindPoseRotation = convertVector(node->LclRotation.Get());
+
+    if (auto parent = node->GetParent(); parent != nullptr) {
+        auto parentAttribute = parent->GetNodeAttribute();
+        if (parentAttribute != nullptr && parentAttribute->GetAttributeType() == FbxNodeAttribute::eSkeleton) {
+            badgerBone.parent = parent->GetName();
+        }
+    }
+
+    for (auto i = 0; i < node->GetChildCount(); i++) {
+        auto child = node->GetChild(i);
+        auto attribute = child->GetNodeAttribute();
+        if (attribute == nullptr || attribute->GetAttributeType() != FbxNodeAttribute::eNull)
+            continue;
+
+        FbxTransform::EInheritType inheritType;
+        child->GetTransformationInheritType(inheritType);
+
+        Badger::BoneLocator locator {};
+        locator.discardScale = inheritType == FbxTransform::eInheritRrs;
+        locator.offset = convertVector(child->LclTranslation.Get());
+        locator.rotation = convertVector(child->LclRotation.Get());
+        badgerBone.locators.insert({child->GetName(), locator});
+    }
+
+    geometry.bones.push_back(badgerBone);
+
+    // Now we iterate over the children a second time. Costs performance, but the exported bones are not reversed in their order anymore.
+
+    for (auto i = 0; i < node->GetChildCount(); i++) {
+        auto child = node->GetChild(i);
+        auto attribute = child->GetNodeAttribute();
+        if (attribute == nullptr || attribute->GetAttributeType() != FbxNodeAttribute::eSkeleton)
+            continue;
+
+        exportBone(geometry, FbxCast<FbxSkeleton>(attribute), child);
+    }
+
     return true;
 }
