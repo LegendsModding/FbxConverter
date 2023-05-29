@@ -103,7 +103,7 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
     modelOutputStream.close();
 
     // TODO
-    /*std::cout << "Creating material JSONs." << std::endl;
+    std::cout << "Creating material JSONs." << std::endl;
 
     auto materialDir = std::filesystem::path(outputDirectory);
     materialDir /= "materials";
@@ -112,12 +112,12 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
     std::ofstream materialOutputStream;
     for (const auto& pair : exportedMaterials) {
         auto materialOutputPath = std::filesystem::path(materialDir);
-        materialOutputPath /= (pair.first + ".json");
+        materialOutputPath /= (pair.second.name + ".json");
         json materialJson(pair.second);
         materialOutputStream.open(materialOutputPath);
         materialOutputStream << materialJson;
         materialOutputStream.close();
-    }*/
+    }
 
     std::cout << "Export finished." << std::endl;
 
@@ -281,7 +281,6 @@ bool BadgerConverter::exportMaterial(const FbxSurfaceMaterial* material) {
         return true;
 
     Badger::MetaMaterial metaMaterial;
-    Badger::MetaMaterialInfo materialInfo;
     auto matDelim = name.rfind("___");
     if (matDelim != std::string::npos) {
         metaMaterial.name = name.substr(0, matDelim);
@@ -291,7 +290,38 @@ bool BadgerConverter::exportMaterial(const FbxSurfaceMaterial* material) {
     }
 
     metaMaterial.formatVersion = "1.8.0";
-    materialInfo.culling = "none";
+    metaMaterial.info.culling = "none";
+
+    auto assignTextureName = [&](const char* isUsedProperty, const char* texProperty, std::string& badgerProp) -> bool {
+        auto usedProp = material->FindPropertyHierarchical(isUsedProperty);
+        if (!usedProp.IsValid()) {
+            std::cerr << "Could not find property " << isUsedProperty << " on material." << std::endl;
+            return false;
+        }
+
+        if (usedProp.Get<bool>()) {
+            auto texProp = material->FindPropertyHierarchical(texProperty);
+            if (!texProp.IsValid()) {
+                std::cerr << "Could not find property " << texProperty << " on material." << std::endl;
+                return false;
+            }
+
+            auto connectedTexture = texProp.GetSrcObject<FbxFileTexture>(0);
+            if (connectedTexture == nullptr) {
+                std::cerr << "Material has no connected texture for property " << texProperty << std::endl;
+                return false;
+            }
+
+            badgerProp = connectedTexture->GetFileName();
+        }
+
+        return true;
+    };
+
+    assignTextureName("Maya|use_color_map", "Maya|TEX_color_map", metaMaterial.info.textures.diffuse);
+    assignTextureName("Maya|use_normal_map", "Maya|TEX_normal_map", metaMaterial.info.textures.normal);
+    assignTextureName("Maya|use_metallic_map", "Maya|TEX_metallic_map", metaMaterial.info.textures.coeff);
+    assignTextureName("Maya|use_emissive_map", "Maya|TEX_emissive_map", metaMaterial.info.textures.emissive);
 
     exportedMaterials.insert({name, metaMaterial});
     return true;
