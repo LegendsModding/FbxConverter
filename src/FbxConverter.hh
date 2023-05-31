@@ -15,6 +15,7 @@ class FbxConverter {
     private:
         bool importMesh(const Badger::Mesh& badgerMesh, size_t meshId);
         bool importBone(const Badger::Bone& badgerBone);
+        bool importAnimation(const std::string& name, const Badger::Animation& badgerAnimation);
         bool generateShaderImplementation(const FbxProperty& mayaProp);
         FbxSurfaceMaterial* getMaterial(const std::string& name);
         FbxManager* manager;

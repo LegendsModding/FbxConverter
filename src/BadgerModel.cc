@@ -1,4 +1,4 @@
-
+#include <iostream>
 #include <fstream>
 #include <string>
 
@@ -258,10 +258,91 @@ namespace Badger {
         };
     }
 
-    #pragma endregion
-
     void Entity::applyTemplate(const Entity& templateEntity) {
         if (!info.components.faceAnimation && templateEntity.info.components.faceAnimation)
             info.components.faceAnimation = templateEntity.info.components.faceAnimation;
     }
+
+    #pragma endregion
+    #pragma region Animation Structs
+
+    [[maybe_unused]] void from_json(const json& j, Animations& p) {
+        j.at("format_version").get_to(p.formatVersion);
+        j.at("animations").get_to(p.animations);
+    }
+
+    [[maybe_unused]] void to_json(json& j, const Animations& p) {
+        j = json {
+            {"format_version", p.formatVersion},
+            {"animations", p.animations}
+        };
+    }
+
+    [[maybe_unused]] void from_json(const json& j, Animation& p) {
+        j.at("anim_time_update").get_to(p.animTimeUpdate);
+        j.at("blend_weight").get_to(p.blendWeight);
+        j.at("bones").get_to(p.bones);
+    }
+
+    [[maybe_unused]] void to_json(json& j, const Animation& p) {
+        j = json {
+            {"anim_time_update", p.animTimeUpdate},
+            {"blend_weight", p.blendWeight},
+            {"bones", p.bones}
+        };
+    }
+
+    [[maybe_unused]] void from_json(const json& j, AnimationBone& p) {
+        j.at("lod_distance").get_to(p.lodDistance);
+
+        auto parseProperties = [&](const json& node, std::unordered_map<double, AnimationProperty>& properties) {
+            for (const auto& val : node.items()) {
+                if (val.key() == "lod_distance")
+                    break;
+
+                auto name = std::stod(val.key());
+
+                if (val.value().is_array()) {
+                    AnimationProperty property {
+                        .lerpMode = "Undefined",
+                        .post = val.value().get<std::vector<double>>()
+                    };
+
+                    properties.insert({name, property});
+                } else {
+                    properties.insert({name, val.value().get<AnimationProperty>()});
+                }
+            };
+        };
+
+        if (j.contains("position")) {
+            p.position = {};
+            parseProperties(j.at("position"), p.position);
+        }
+
+        if (j.contains("rotation")) {
+            p.rotation = {};
+            parseProperties(j.at("rotation"), p.rotation);
+        }
+    }
+
+    [[maybe_unused]] void to_json(json& j, const AnimationBone& p) {
+        j = json {
+            {"lod_distance", p.lodDistance}
+        };
+    }
+
+    [[maybe_unused]] void from_json(const json& j, AnimationProperty& p) {
+        j.at("lerp_mode").get_to(p.lerpMode);
+        j.at("post").get_to(p.post);
+    }
+
+    [[maybe_unused]] void to_json(json& j, const AnimationProperty& p) {
+        j = json {
+            {"lerp_mode", p.lerpMode},
+            {"post", p.post}
+        };
+    }
+
+    #pragma endregion
 }

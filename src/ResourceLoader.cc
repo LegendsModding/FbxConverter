@@ -36,6 +36,13 @@ std::optional<const Badger::Entity> ResourceLoader::getEntity(const std::string&
     return loadEntity(name);
 }
 
+std::optional<const Badger::Animations> ResourceLoader::getAnimations(const std::string& name) {
+    if (const auto& it = animationCache.find(name); it != animationCache.end())
+        return it->second;
+
+    return loadAnimations(name);
+}
+
 std::optional<const Badger::Model> ResourceLoader::loadModel(const std::string& name) {
     auto filename = name + ".model.json";
     for (const auto& packDirectory : resourcePacks) {
@@ -177,5 +184,33 @@ std::optional<const Badger::Entity> ResourceLoader::loadEntity(const std::string
     }
 
     std::cerr << "Error: could not find entity " << name << " in any resource pack." << std::endl;
+    return {};
+}
+
+std::optional<const Badger::Animations> ResourceLoader::loadAnimations(const std::string& name) {
+    auto filename = name + ".animations.json";
+    for (const auto& packDirectory : resourcePacks) {
+        auto path = packDirectory / "animations" / filename;
+        if (!std::filesystem::exists(path)) {
+            continue;
+        }
+
+        std::ifstream file(path);
+        if (!file) {
+            std::cerr << "Error: could not open animations at path " << path << "." << std::endl;
+            return {};
+        }
+
+        try {
+            auto animations = json::parse(file).get<Badger::Animations>();
+            animationCache.insert({name, animations});
+            return animations;
+        } catch (json::exception& e) {
+            std::cerr << "Error: failed to parse json (" << e.what() << ")" << std::endl;
+            return {};
+        }
+    }
+
+    std::cerr << "Error: could not find animations for " << name << " in any resource pack." << std::endl;
     return {};
 }

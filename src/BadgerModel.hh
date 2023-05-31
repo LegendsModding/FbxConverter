@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <variant>
 #include <filesystem>
 
 #include <nlohmann/json.hpp>
@@ -117,7 +118,6 @@ namespace Badger {
     void to_json(json& j, const MetaMaterial& p);
 
     #pragma endregion
-
     #pragma region Entity Structs
 
     struct FaceAnimation {
@@ -153,6 +153,43 @@ namespace Badger {
 
     void from_json(const json& j, FaceAnimation& p);
     void to_json(json& j, const FaceAnimation& p);
+
+    #pragma endregion
+    #pragma region Animation Structs
+
+    struct AnimationProperty {
+        std::string lerpMode;
+        std::vector<double> post;
+    };
+
+    struct AnimationBone {
+        double lodDistance;
+        std::unordered_map<double, AnimationProperty> rotation;
+        std::unordered_map<double, AnimationProperty> position;
+    };
+
+    struct Animation {
+        std::string animTimeUpdate;
+        std::string blendWeight;
+        std::unordered_map<std::string, AnimationBone> bones;
+    };
+
+    struct Animations {
+        std::string formatVersion;
+        std::unordered_map<std::string, Animation> animations;
+    };
+
+    void from_json(const json& j, Animations& p);
+    void to_json(json& j, const Animations& p);
+
+    void from_json(const json& j, Animation& p);
+    void to_json(json& j, const Animation& p);
+
+    void from_json(const json& j, AnimationBone& p);
+    void to_json(json& j, const AnimationBone& p);
+
+    void from_json(const json& j, AnimationProperty& p);
+    void to_json(json& j, const AnimationProperty& p);
 
     #pragma endregion
 }

@@ -15,7 +15,7 @@ BadgerConverter::BadgerConverter() : model() {
 bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirectory) {
     auto importer = FbxImporter::Create(manager, "");
 
-    auto fbxFilename = std::filesystem::path(fbx).filename().string();
+    auto fbxFilename = std::filesystem::path(fbx).stem().string();
 
     std::cout << "Importing fbx." << std::endl;
 

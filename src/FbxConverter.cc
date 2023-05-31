@@ -95,6 +95,18 @@ bool FbxConverter::convertToFbx(const char* model, const char* output) {
         }
     }
 
+    auto animations = loader->getAnimations(modelName);
+    if (animations.has_value()) {
+        std::cout << "Importing animations." << std::endl;
+        for (const auto& animation : animations->animations) {
+            auto name = animation.first;
+            if (name.starts_with("animation."))
+                name = name.substr(10);
+
+            importAnimation(name, animation.second);
+        }
+    }
+
     std::cout << "Exporting model." << std::endl;
 
     auto exporter = FbxExporter::Create(manager, "");
@@ -339,6 +351,80 @@ bool FbxConverter::importBone(const Badger::Bone& badgerBone) {
     return true;
 }
 
+bool FbxConverter::importAnimation(const std::string& name, const Badger::Animation& badgerAnimation) {
+    auto animationStack = FbxAnimStack::Create(scene, (name + "_stack").c_str());
+    auto animationLayer = FbxAnimLayer::Create(scene, name.c_str());
+    animationStack->AddMember(animationLayer);
+
+    animationLayer->BlendMode.Set(FbxAnimLayer::eBlendAdditive);
+
+    auto setKeyframes = [&](FbxPropertyT<FbxDouble3>& property, const std::unordered_map<double, Badger::AnimationProperty>& keyframeInfo) {
+        if (keyframeInfo.empty())
+            return;
+        
+        FbxTime keyframeTime;
+
+        auto originalX = property.Get()[0];
+        auto originalY = property.Get()[1];
+        auto originalZ = property.Get()[2];
+
+        auto curveNode = property.GetCurveNode(animationLayer, true);
+        auto translationX = property.GetCurve(animationLayer, FBXSDK_CURVENODE_COMPONENT_X, true);
+        auto translationY = property.GetCurve(animationLayer, FBXSDK_CURVENODE_COMPONENT_Y, true);
+        auto translationZ = property.GetCurve(animationLayer, FBXSDK_CURVENODE_COMPONENT_Z, true);
+
+        translationX->KeyModifyBegin();
+        translationY->KeyModifyBegin();
+        translationZ->KeyModifyBegin();
+
+        auto ind = 0;
+        for (const auto& currentKeyframe : keyframeInfo) {
+            keyframeTime.SetSecondDouble(currentKeyframe.first);
+            
+            ind = translationX->KeyAdd(keyframeTime);
+            translationX->KeySet(
+                ind,
+                keyframeTime, 
+                originalX + currentKeyframe.second.post[0],
+                FbxAnimCurveDef::eInterpolationLinear
+            );
+
+            ind = translationY->KeyAdd(keyframeTime);
+            translationY->KeySet(
+                ind,
+                keyframeTime, 
+                originalY + currentKeyframe.second.post[1],
+                FbxAnimCurveDef::eInterpolationLinear
+            );
+
+            ind = translationZ->KeyAdd(keyframeTime);
+            translationZ->KeySet(
+                ind,
+                keyframeTime, 
+                originalZ + currentKeyframe.second.post[2],
+                FbxAnimCurveDef::eInterpolationLinear
+            );
+        }
+
+        translationX->KeyModifyEnd();
+        translationY->KeyModifyEnd();
+        translationZ->KeyModifyEnd();
+    };
+    
+    for (const auto& boneAnimation : badgerAnimation.bones) {
+        auto boneNode = scene->FindNodeByName(boneAnimation.first.c_str());
+        if (boneNode == nullptr) {
+            std::cerr << "Error: could not find bone " << boneAnimation.first << " in the scene." << std::endl;
+            return false;
+        }
+
+        setKeyframes(boneNode->LclTranslation, boneAnimation.second.position);
+        setKeyframes(boneNode->LclRotation, boneAnimation.second.rotation);
+    }
+
+    return true;
+}
+
 FbxSurfaceMaterial* FbxConverter::getMaterial(const std::string& name) {
     if (auto it = createdMaterials.find(name); it != createdMaterials.end())
         return it->second;
@@ -365,7 +451,7 @@ FbxSurfaceMaterial* FbxConverter::getMaterial(const std::string& name) {
     auto material = FbxSurfaceMaterial::Create(scene, mayaMatName.c_str());
     auto mayaProperty = FbxProperty::Create(material, FbxCompoundDT, "Maya", "");
 
-    auto typeIdProp = FbxProperty::Create(mayaProperty, FbxIntDT, "TypeId", "a");
+    auto typeIdProp = FbxProperty::Create(mayaProperty, FbxIntDT, "TypeId", "");
     typeIdProp.Set(1166017);
 
     auto gdCubeProp = FbxProperty::Create(mayaProperty, FbxDouble3DT, "TEX_global_diffuse_cube", "");
