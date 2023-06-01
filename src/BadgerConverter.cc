@@ -65,6 +65,18 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
         }
     }
 
+    auto animationCount = scene->GetSrcObjectCount<FbxAnimStack>();
+    if (animationCount > 0) {
+        std::cout << "Exporting animations." << std::endl;
+        for (auto i = 0; i < animationCount; i++) {
+            auto stack = scene->GetSrcObject<FbxAnimStack>(i);
+            if (!exportAnimation(stack)) {
+                std::cerr << "Error: failed to export animation." << std::endl;
+                return false;
+            }
+        }
+    }
+
 
     if (geometry.bones.empty()) {
         Badger::Bone bone {
@@ -100,7 +112,7 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
 
     std::ofstream modelOutputStream(modelOutput, std::ios::out);
 
-    nlohmann::json modelJson(model);
+    json modelJson(model);
     modelOutputStream << modelJson;
     modelOutputStream.close();
 
@@ -118,6 +130,9 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
         std::filesystem::path originalTexPath(path);
         std::filesystem::path newTexPath(textureDir);
         newTexPath /= originalTexPath.filename();
+
+        if (std::filesystem::exists(newTexPath))
+            std::filesystem::remove(newTexPath);
 
         std::filesystem::copy(originalTexPath, newTexPath);
 
@@ -141,6 +156,25 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
         materialOutputStream.open(materialOutputPath);
         materialOutputStream << materialJson;
         materialOutputStream.close();
+    }
+
+    if (!exportedAnimations.empty()) {
+        std::cout << "Creating animation JSON." << std::endl;
+
+        Badger::Animations animations {
+            .formatVersion = "1.8.0",
+            .animations = exportedAnimations
+        };
+
+        auto animationsPath = std::filesystem::path(outputDirectory) / "animations";
+        std::filesystem::create_directories(animationsPath);
+
+        animationsPath /= (fbxFilename + ".animations.json");
+
+        std::ofstream animationsOutputStream(animationsPath, std::ios::out);
+        json animationsJson(animations);
+        animationsOutputStream << animationsJson;
+        animationsOutputStream.close();
     }
 
     std::cout << "Export finished." << std::endl;
@@ -399,5 +433,104 @@ bool BadgerConverter::exportBone(Badger::Geometry& geometry, const FbxSkeleton* 
         exportBone(geometry, FbxCast<FbxSkeleton>(attribute), child);
     }
 
+    return true;
+}
+
+bool BadgerConverter::exportAnimation(FbxAnimStack* stack) {
+    std::string name(stack->GetName());
+
+    if (!name.starts_with("animation."))
+        name = "animation." + name;
+
+    Badger::Animation badgerAnimation {
+        .animTimeUpdate = "(query.anim_time + (query.delta_time * 1))",
+        .blendWeight = "1",
+        .bones = {}
+    };
+
+    scene->SetCurrentAnimationStack(stack);
+
+    /*FbxTime animPeriodTime;
+    animPeriodTime.SetSecondDouble(0.0333333333333);
+
+    auto result = stack->BakeLayers(scene->GetAnimationEvaluator(), stack->LocalStart.Get(), stack->LocalStop.Get(), animPeriodTime);
+    if (!result) {
+        std::cerr << "Error while baking animation layers." << std::endl;
+        return false;
+    }*/
+
+    auto baseLayer = stack->GetMember<FbxAnimLayer>(0);
+    if (baseLayer == nullptr) {
+        std::cerr << "Error: animation has no base layer!" << std::endl;
+        return false;
+    }
+    
+    for (auto i = 0; i < baseLayer->GetSrcObjectCount<FbxAnimCurveNode>(); i++) {
+        auto curveNode = baseLayer->GetSrcObject<FbxAnimCurveNode>(i);
+        if (curveNode->GetChannelsCount() != 3 && curveNode->GetDstPropertyCount() != 1) {
+            std::cerr << "Error: unsupported curve node in animation." << std::endl;
+            return false;
+        }
+
+        auto connectedProperty = curveNode->GetDstProperty(0);
+        std::string propertyName(connectedProperty.GetName());
+        if (propertyName != "Lcl Translation" && propertyName != "Lcl Rotation") {
+            std::cerr << "Error: unsupported connected curve property in animation. Only translation and rotation is supported." << std::endl;
+            return false;
+        }
+
+        auto boneName = connectedProperty.GetParent().GetName();
+        
+        auto curveX = connectedProperty.GetCurve(baseLayer, FBXSDK_CURVENODE_COMPONENT_X, false);
+        auto curveY = connectedProperty.GetCurve(baseLayer, FBXSDK_CURVENODE_COMPONENT_Y, false);
+        auto curveZ = connectedProperty.GetCurve(baseLayer, FBXSDK_CURVENODE_COMPONENT_Z, false);
+
+        auto defaultValues = connectedProperty.Get<FbxDouble3>();
+        //std::cout << "def " << defaultValues[0] << " y " << defaultValues[1] << " z " << defaultValues[2] << std::endl;
+
+        if (curveX == nullptr || curveY == nullptr || curveZ == nullptr) {
+            std::cerr << "Error: one or more required curve components are missing." << std::endl;
+            return false;
+        }
+
+        std::unordered_map<double, Badger::AnimationProperty> keyframeData;
+
+        auto keyCount = curveX->KeyGetCount();
+        for (auto j = 0; j < keyCount; j++) {
+            auto xKey = curveX->KeyGet(j);
+            auto yKey = curveY->KeyGet(j);
+            auto zKey = curveZ->KeyGet(j);
+
+            //std::cout << xKey.GetTime().GetSecondDouble() << std::endl;
+            //std::cout << "key " << xKey.GetValue() << " y " << yKey.GetValue() << " z " << zKey.GetValue() << std::endl;
+
+            keyframeData.insert({
+                xKey.GetTime().GetSecondDouble(),
+                {
+                    .lerpMode = "catmullrom",
+                    .post = {
+                        xKey.GetValue() - defaultValues[0],
+                        yKey.GetValue() - defaultValues[1], 
+                        zKey.GetValue() - defaultValues[2]
+                    }
+                }
+            });
+        }
+
+        auto namePtr = boneName.Buffer();
+
+        if (!badgerAnimation.bones.contains(namePtr)) {
+            badgerAnimation.bones.insert({namePtr, {
+                .lodDistance = 0
+            }});
+        }
+
+        if (propertyName == "Lcl Translation")
+            badgerAnimation.bones[namePtr].position = keyframeData;
+        else
+            badgerAnimation.bones[namePtr].rotation = keyframeData;
+    }
+
+    exportedAnimations.insert({name, badgerAnimation});
     return true;
 }

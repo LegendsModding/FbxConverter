@@ -330,6 +330,31 @@ namespace Badger {
         j = json {
             {"lod_distance", p.lodDistance}
         };
+
+        auto writeProperties = [&](const std::unordered_map<double, AnimationProperty>& properties, json& node) {
+            for (const auto& keyframe : properties) {
+                auto key = std::to_string(keyframe.first);
+
+                if (keyframe.second.lerpMode == "Undefined")
+                    node[key] = keyframe.second.post;
+                else
+                    node[key] = keyframe.second;
+            }
+
+            node["lod_distance"] = 0.0;
+        };
+
+        if (!p.position.empty()) {
+            json val {};
+            writeProperties(p.position, val);
+            j["position"] = val;
+        }
+
+        if (!p.rotation.empty()) {
+            json val {};
+            writeProperties(p.rotation, val);
+            j["rotation"] = val;
+        }
     }
 
     [[maybe_unused]] void from_json(const json& j, AnimationProperty& p) {

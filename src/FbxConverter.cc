@@ -352,17 +352,15 @@ bool FbxConverter::importBone(const Badger::Bone& badgerBone) {
 }
 
 bool FbxConverter::importAnimation(const std::string& name, const Badger::Animation& badgerAnimation) {
-    auto animationStack = FbxAnimStack::Create(scene, (name + "_stack").c_str());
-    auto animationLayer = FbxAnimLayer::Create(scene, name.c_str());
+    auto animationStack = FbxAnimStack::Create(scene, name.c_str());
+    auto animationLayer = FbxAnimLayer::Create(scene, (name + "_baseLayer").c_str());
     animationStack->AddMember(animationLayer);
 
     animationLayer->BlendMode.Set(FbxAnimLayer::eBlendAdditive);
 
-    auto setKeyframes = [&](FbxPropertyT<FbxDouble3>& property, const std::unordered_map<double, Badger::AnimationProperty>& keyframeInfo) {
+    auto setKeyframes = [&](FbxTime& keyframeTime, FbxPropertyT<FbxDouble3>& property, const std::unordered_map<double, Badger::AnimationProperty>& keyframeInfo) {
         if (keyframeInfo.empty())
             return;
-        
-        FbxTime keyframeTime;
 
         auto originalX = property.Get()[0];
         auto originalY = property.Get()[1];
@@ -410,7 +408,9 @@ bool FbxConverter::importAnimation(const std::string& name, const Badger::Animat
         translationY->KeyModifyEnd();
         translationZ->KeyModifyEnd();
     };
-    
+
+    FbxTime time; // Will be stop time once setKeyframe is done
+
     for (const auto& boneAnimation : badgerAnimation.bones) {
         auto boneNode = scene->FindNodeByName(boneAnimation.first.c_str());
         if (boneNode == nullptr) {
@@ -418,9 +418,12 @@ bool FbxConverter::importAnimation(const std::string& name, const Badger::Animat
             return false;
         }
 
-        setKeyframes(boneNode->LclTranslation, boneAnimation.second.position);
-        setKeyframes(boneNode->LclRotation, boneAnimation.second.rotation);
+        setKeyframes(time, boneNode->LclTranslation, boneAnimation.second.position);
+        setKeyframes(time, boneNode->LclRotation, boneAnimation.second.rotation);
     }
+
+    animationStack->LocalStart.Set(FbxTime(0));
+    animationStack->LocalStop.Set(time);
 
     return true;
 }
