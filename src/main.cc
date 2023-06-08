@@ -20,7 +20,7 @@ int main(int argc, char** argv)
     auto doImport = command == "import";
 
     if (!(doExport && argc == 5) && !(doImport && argc == 4)) {
-        std::cout << "FbxImporter v0.2.0 made by LukeFZ" << std::endl;
+        std::cout << "FbxImporter v0.3.0 made by LukeFZ" << std::endl;
         std::cout << "Usage: " << argv[0] << " <command> <arguments>" << std::endl;
         std::cout << "Command 'export': <path to resource packs> <model name> <path to output .fbx>" << std::endl;
         std::cout << "Command 'import': <path to input fbx> <output folder>" << std::endl;
