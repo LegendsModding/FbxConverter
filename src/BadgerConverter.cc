@@ -47,7 +47,7 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
         auto type = attribute->GetAttributeType();
 
         if (type == FbxNodeAttribute::eSkeleton) {
-            std::cout << "Exporting bones." << std::endl;
+            std::cout << "Node: " << child->GetName() << " - exporting bone." << std::endl;
 
             FbxSkeleton* bone = FbxCast<FbxSkeleton>(attribute);
             if (!exportBone(geometry, bone, child)) {
@@ -55,7 +55,7 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
                 return false;
             }
         } else if (type == FbxNodeAttribute::eMesh) {
-            std::cout << "Exporting mesh." << std::endl;
+            std::cout << "Node: " << child->GetName() << " - exporting mesh." << std::endl;
 
             FbxMesh* mesh = FbxCast<FbxMesh>(attribute);
             if (!exportMesh(geometry, mesh, child)) {
@@ -296,8 +296,12 @@ bool BadgerConverter::exportMesh(Badger::Geometry& geometry, const FbxMesh* mesh
 
             auto weightsPointer = cluster->GetControlPointWeights();
 
-            if (cluster->GetControlPointIndicesCount() != controlPointCount
-                || weightsPointer == nullptr) {
+            if (weightsPointer == nullptr) {
+                std::cerr << "Error: skin cluster has no weights." << std::endl;
+                return false;
+            }
+
+            if (cluster->GetControlPointIndicesCount() != controlPointCount) {
                 std::cerr << "Error: skin cluster weight count did not match control point count." << std::endl;
                 return false;
             }
