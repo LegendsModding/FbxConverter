@@ -89,7 +89,7 @@ std::optional<const Badger::Model> ResourceLoader::loadModel(const std::string& 
         }
     }
 
-    std::cerr << "Error: could not find model " << name << " in any resource pack." << std::endl;
+    std::cerr << "Warning: could not find model " << name << " in any resource pack." << std::endl;
     return {};
 }
 
@@ -122,7 +122,7 @@ std::optional<const Badger::MetaMaterial> ResourceLoader::loadMaterial(const std
                 }
 
                 if (!texturesFound) {
-                    std::cerr << "Error: failed to find texture " << material.info.textures.diffuse << " in any resource pack." << std::endl;
+                    std::cerr << "Warning: failed to find texture " << material.info.textures.diffuse << " in any resource pack." << std::endl;
                     return {};
                 }
             }
@@ -145,7 +145,7 @@ std::optional<const Badger::MetaMaterial> ResourceLoader::loadMaterial(const std
         }
     }
 
-    std::cerr << "Error: could not find material " << name << " in any resource pack." << std::endl;
+    std::cerr << "Warning: could not find material " << name << " in any resource pack." << std::endl;
     return {};
 }
 
@@ -183,7 +183,7 @@ std::optional<const Badger::Entity> ResourceLoader::loadEntity(const std::string
         }
     }
 
-    std::cerr << "Error: could not find entity " << name << " in any resource pack." << std::endl;
+    std::cerr << "Warning: could not find entity " << name << " in any resource pack." << std::endl;
     return {};
 }
 
@@ -211,6 +211,6 @@ std::optional<const Badger::Animations> ResourceLoader::loadAnimations(const std
         }
     }
 
-    std::cerr << "Error: could not find animations for " << name << " in any resource pack." << std::endl;
+    std::cerr << "Warning: could not find animations for " << name << " in any resource pack." << std::endl;
     return {};
 }
