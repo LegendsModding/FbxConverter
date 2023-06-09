@@ -283,6 +283,7 @@ bool BadgerConverter::exportMesh(Badger::Geometry& geometry, const FbxMesh* mesh
         std::cout << "Exporting skin information." << std::endl;
         FbxSkin* skin = FbxCast<FbxSkin>(deformer);
 
+        // Using resize here as we need the elements initialized
         badgerMesh.weights.resize(controlPointCount);
         badgerMesh.indices.resize(controlPointCount);
 
@@ -294,23 +295,35 @@ bool BadgerConverter::exportMesh(Badger::Geometry& geometry, const FbxMesh* mesh
                 return false;
             }
 
-            auto weightsPointer = cluster->GetControlPointWeights();
+            auto clusterControlPointCount = cluster->GetControlPointIndicesCount();
 
-            if (weightsPointer == nullptr) {
-                std::cerr << "Error: skin cluster has no weights." << std::endl;
+            if (clusterControlPointCount == 0)
+                continue;
+
+            auto indices = cluster->GetControlPointIndices();
+            auto weights = cluster->GetControlPointWeights();
+
+            if (indices == nullptr) {
+                std::cerr << "Error: skin cluster has no indices." << std::endl;
                 return false;
             }
 
-            if (cluster->GetControlPointIndicesCount() != controlPointCount) {
-                std::cerr << "Error: skin cluster weight count did not match control point count." << std::endl;
+            if (weights == nullptr) {
+                std::cerr << "Error: skin cluster has no weights." << std::endl;
                 return false;
             }
 
             auto boneName = link->GetName();
 
-            for (auto j = 0; j < controlPointCount; j++) {
-                badgerMesh.indices.at(j).push_back(boneName);
-                badgerMesh.weights.at(j).push_back(weightsPointer[j]);
+            for (auto j = 0; j < clusterControlPointCount; j++) {
+                auto controlPointIndex = indices[j];
+                if (controlPointIndex >= controlPointCount) {
+                    std::cerr << "Error: skin cluster contains control point index which is greater than the total control point count." << std::endl;
+                    return false;
+                }
+
+                badgerMesh.indices.at(controlPointIndex).push_back(boneName);
+                badgerMesh.weights.at(controlPointIndex).push_back(weights[j]);
             }
         }
     }
