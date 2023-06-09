@@ -31,6 +31,11 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
 
     std::cout << "Imported fbx." << std::endl;
 
+    FbxGeometryConverter converter(manager);
+    if (!converter.Triangulate(scene, true)) {
+        std::cerr << "Error: failed to triangulate mesh." << std::endl;
+        return false;
+    }
     Badger::Geometry geometry;
     geometry.description.identifier = "geometry." + fbxFilename;
 
