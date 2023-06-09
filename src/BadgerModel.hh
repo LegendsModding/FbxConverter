@@ -166,6 +166,7 @@ namespace Badger {
         double lodDistance;
         std::unordered_map<double, AnimationProperty> rotation;
         std::unordered_map<double, AnimationProperty> position;
+        std::unordered_map<double, AnimationProperty> scale;
     };
 
     struct Animation {

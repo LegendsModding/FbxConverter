@@ -472,15 +472,20 @@ bool BadgerConverter::exportAnimation(FbxAnimStack* stack) {
     for (auto i = 0; i < baseLayer->GetSrcObjectCount<FbxAnimCurveNode>(); i++) {
         auto curveNode = baseLayer->GetSrcObject<FbxAnimCurveNode>(i);
         if (curveNode->GetChannelsCount() != 3 && curveNode->GetDstPropertyCount() != 1) {
-            std::cerr << "Error: unsupported curve node in animation." << std::endl;
-            return false;
+            std::cerr << "Warning: unsupported curve node in animation." << std::endl;
+            continue;
         }
 
         auto connectedProperty = curveNode->GetDstProperty(0);
         std::string propertyName(connectedProperty.GetName());
-        if (propertyName != "Lcl Translation" && propertyName != "Lcl Rotation") {
-            std::cerr << "Error: unsupported connected curve property in animation. Only translation and rotation is supported." << std::endl;
-            return false;
+
+        auto isTranslation = propertyName == "Lcl Translation";
+        auto isRotation = !isTranslation && propertyName == "Lcl Rotation";
+        auto isScale = !isTranslation && !isRotation && propertyName == "Lcl Scaling";
+
+        if (!isTranslation && !isRotation && !isScale) {
+            std::cerr << "Warning: unsupported connected curve property (" << propertyName << ") in animation. Only translation, rotation and scale is supported." << std::endl;
+            continue;
         }
 
         auto boneName = connectedProperty.GetParent().GetName();
@@ -499,8 +504,17 @@ bool BadgerConverter::exportAnimation(FbxAnimStack* stack) {
 
         std::unordered_map<double, Badger::AnimationProperty> keyframeData;
 
-        auto keyCount = curveX->KeyGetCount();
-        for (auto j = 0; j < keyCount; j++) {
+        auto xKeyCount = curveX->KeyGetCount();
+        auto yKeyCount = curveY->KeyGetCount();
+        auto zKeyCount = curveZ->KeyGetCount();
+
+        if (xKeyCount != yKeyCount || zKeyCount != xKeyCount) {
+            std::cerr << "Error: key count mismatch between the x/y/z animation curves. (" << xKeyCount << "/" << yKeyCount << "/" << zKeyCount << ")" << std::endl;
+            std::cerr << "Hint: if you are exporting this model from blender, setting \"Simplify\" to 0.0 will fix this issue." << std::endl;
+            return false;
+        }
+
+        for (auto j = 0; j < xKeyCount; j++) {
             auto xKey = curveX->KeyGet(j);
             auto yKey = curveY->KeyGet(j);
             auto zKey = curveZ->KeyGet(j);
@@ -529,10 +543,12 @@ bool BadgerConverter::exportAnimation(FbxAnimStack* stack) {
             }});
         }
 
-        if (propertyName == "Lcl Translation")
+        if (isTranslation)
             badgerAnimation.bones[namePtr].position = keyframeData;
-        else
+        else if (isRotation)
             badgerAnimation.bones[namePtr].rotation = keyframeData;
+        else if (isScale)
+            badgerAnimation.bones[namePtr].scale = keyframeData;
     }
 
     exportedAnimations.insert({name, badgerAnimation});

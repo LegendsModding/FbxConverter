@@ -420,6 +420,7 @@ bool FbxConverter::importAnimation(const std::string& name, const Badger::Animat
 
         setKeyframes(time, boneNode->LclTranslation, boneAnimation.second.position);
         setKeyframes(time, boneNode->LclRotation, boneAnimation.second.rotation);
+        setKeyframes(time, boneNode->LclScaling, boneAnimation.second.scale);
     }
 
     animationStack->LocalStart.Set(FbxTime(0));

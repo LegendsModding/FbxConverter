@@ -324,6 +324,11 @@ namespace Badger {
             p.rotation = {};
             parseProperties(j.at("rotation"), p.rotation);
         }
+
+        if (j.contains("scale")) {
+            p.scale = {};
+            parseProperties(j.at("scale"), p.scale);
+        }
     }
 
     [[maybe_unused]] void to_json(json& j, const AnimationBone& p) {
@@ -354,6 +359,12 @@ namespace Badger {
             json val {};
             writeProperties(p.rotation, val);
             j["rotation"] = val;
+        }
+
+        if (!p.scale.empty()) {
+            json val {};
+            writeProperties(p.scale, val);
+            j["scale"] = val;
         }
     }
 
