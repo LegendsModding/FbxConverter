@@ -36,39 +36,48 @@ bool BadgerConverter::convertToBadger(const char* fbx, const char* outputDirecto
         std::cerr << "Error: failed to triangulate mesh." << std::endl;
         return false;
     }
+
     Badger::Geometry geometry;
     geometry.description.identifier = "geometry." + fbxFilename;
 
+    const auto processNodeRecursive = [this, &geometry](FbxNode* const child) {
+        const auto process = [this, &geometry](FbxNode* const child, auto& processFunc) {
+            auto attribute = child->GetNodeAttribute();
+            if (attribute != nullptr) {
+                auto type = attribute->GetAttributeType();
+
+                if (type == FbxNodeAttribute::eSkeleton) {
+                    std::cout << "Node: " << child->GetName() << " - exporting bone." << std::endl;
+
+                    FbxSkeleton* bone = FbxCast<FbxSkeleton>(attribute);
+                    if (!exportBone(geometry, bone, child)) {
+                        std::cerr << "Error: failed to export bone." << std::endl;
+                        return false;
+                    }
+                } else if (type == FbxNodeAttribute::eMesh) {
+                    std::cout << "Node: " << child->GetName() << " - exporting mesh." << std::endl;
+
+                    FbxMesh* mesh = FbxCast<FbxMesh>(attribute);
+                    if (!exportMesh(geometry, mesh, child)) {
+                        std::cerr << "Error: failed to export mesh." << std::endl;
+                        return false;
+                    }
+                }
+            }
+
+            for (auto i = 0; i < child->GetChildCount(); i++) {
+                if (!processFunc(child->GetChild(i), processFunc))
+                    return false;
+            }
+
+            return true;
+        };
+
+        return process(child, process);
+    };
+
     auto root = scene->GetRootNode();
-    auto nodeCount = root->GetChildCount();
-
-    for (auto i = 0; i < nodeCount; i++) {
-        auto child = root->GetChild(i);
-        auto attribute = child->GetNodeAttribute();
-        if (attribute == nullptr) {
-            continue;
-        }
-
-        auto type = attribute->GetAttributeType();
-
-        if (type == FbxNodeAttribute::eSkeleton) {
-            std::cout << "Node: " << child->GetName() << " - exporting bone." << std::endl;
-
-            FbxSkeleton* bone = FbxCast<FbxSkeleton>(attribute);
-            if (!exportBone(geometry, bone, child)) {
-                std::cerr << "Error: failed to export bone." << std::endl;
-                return false;
-            }
-        } else if (type == FbxNodeAttribute::eMesh) {
-            std::cout << "Node: " << child->GetName() << " - exporting mesh." << std::endl;
-
-            FbxMesh* mesh = FbxCast<FbxMesh>(attribute);
-            if (!exportMesh(geometry, mesh, child)) {
-                std::cerr << "Error: failed to export mesh." << std::endl;
-                return false;
-            }
-        }
-    }
+    processNodeRecursive(root);
 
     auto animationCount = scene->GetSrcObjectCount<FbxAnimStack>();
     if (animationCount > 0) {
@@ -310,7 +319,7 @@ bool BadgerConverter::exportMesh(Badger::Geometry& geometry, const FbxMesh* mesh
 
             if (indices == nullptr) {
                 std::cerr << "Error: skin cluster has no indices." << std::endl;
-                return false;
+                return false;             
             }
 
             if (weights == nullptr) {
